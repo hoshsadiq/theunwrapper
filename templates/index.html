@@ -640,7 +640,7 @@ progress:indeterminate::-moz-progress-bar {
         {{if .Err}}
             <p style="text-align:center;"><strong>Error</strong>: {{.Err}}</p>
         {{else}}
-            <p style="text-align: center;"><a style="font-size: 30px; text-align: center;" href="{{.Result | stripParams | toString}}">{{.Result | stripParams | toString}}</a></p>
+            <p style="text-align: center;"><a style="font-size: 30px; text-align: center;" href="{{.Result | toString | cleanURL}}">{{.Result | toString | cleanURL}}</a></p>
             <br/>
             <br/>
             <p style="text-align: center; font-size:14px"><strong>Unstripped:</strong> <a href="{{.Result | toString}}">{{.Result | toString}}</a></p>

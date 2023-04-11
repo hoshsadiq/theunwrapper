@@ -11,8 +11,8 @@ import (
 	"net/url"
 
 	"github.com/djhworld/theunwrapper/chain"
-	"github.com/djhworld/theunwrapper/queryparam"
 	"github.com/djhworld/theunwrapper/unwrap"
+	"github.com/hoshsadiq/go-clearurls"
 )
 
 var flagPort = flag.Uint("port", 8080, "port")
@@ -28,10 +28,12 @@ var knownUnwrappers map[string]*unwrap.Unwrapper
 //go:embed config/*
 var embedFS embed.FS
 
+var cu = clearurls.New()
+
 var tmpl = template.Must(template.New("index.html").Funcs(template.FuncMap{
-	"stripParams": queryparam.Strip,
-	"toString":    toString,
-	"ellipsis":    ellipsis,
+	"cleanURL": cu.Clean,
+	"toString": toString,
+	"ellipsis": ellipsis,
 }).ParseFS(embedFS, "templates/*.html"))
 
 type Output struct {
