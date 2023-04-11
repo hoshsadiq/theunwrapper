@@ -6,16 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
-	"os"
-	"time"
 
 	"github.com/djhworld/theunwrapper/chain"
 	"github.com/djhworld/theunwrapper/queryparam"
 	"github.com/djhworld/theunwrapper/unwrap"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var flagPort = flag.Uint("port", 8080, "port")
@@ -38,7 +35,7 @@ var tmpl = template.Must(template.New("index.html").Funcs(template.FuncMap{
 }).ParseFS(embedFS, "templates/*.html"))
 
 type Output struct {
-	Visited []chain.ChainEntry
+	Visited []chain.Entry
 	Result  *url.URL
 	Err     error
 }
@@ -57,7 +54,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var output Output
 	chained, err := chain.New(r, knownUnwrappers)
 	if err != nil {
-		log.Error().Err(err).Send()
+		log.Printf("error: failed to get chained wrappers: %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		output.Err = err
 		tmpl.Execute(w, output)
@@ -80,36 +77,19 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	output.Err = nil
 
 	if err := tmpl.Execute(w, output); err != nil {
-		log.Error().Err(err).Send()
+		log.Printf("error: failed to parse template: %s", err)
 	} else {
-		log.Info().Msg("completed processing request")
+		log.Println("completed processing request")
 	}
 }
 
 func main() {
 	flag.Parse()
-	configureLogging()
 
-	log.Info().Msgf("starting unwrapper service on port: %d", *flagPort)
+	log.Printf("starting unwrapper service on port: %d", *flagPort)
 	loadUnwrappers()
 	http.HandleFunc("/", handler)
 	http.ListenAndServe(fmt.Sprintf(":%d", *flagPort), nil)
-}
-
-func configureLogging() {
-	switch *flagLogFormat {
-	case "pretty":
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	case "json":
-	default:
-		log.Fatal().Msgf("unknown log format: %s", *flagLogFormat)
-	}
-
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-
-	if *flagLogDebug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
 }
 
 type unwrapperDef struct {
@@ -120,20 +100,19 @@ type unwrapperDef struct {
 func loadUnwrappers() {
 	f, err := embedFS.Open("config/unwrappers.json")
 	if err != nil {
-		log.Fatal().Err(err).Send()
+		log.Fatalf("error: failed to read unwrappers.json: %s", err)
 	}
 	defer f.Close()
 
 	decoder := json.NewDecoder(f)
 	var unwrapperDefs []unwrapperDef
 	if err := decoder.Decode(&unwrapperDefs); err != nil {
-		log.Fatal().Err(err).Send()
+		log.Fatalf("error: failed to decode unwrappers: %s", err)
 	}
 
 	knownUnwrappers = make(map[string]*unwrap.Unwrapper)
 	for _, d := range unwrapperDefs {
-		log.Debug().Msgf("creating unwrapper for: %s (%s)", d.Host, d.Description)
 		knownUnwrappers[d.Host] = unwrap.New(d.Host, d.Description, *flagUpstreamDNS)
 	}
-	log.Info().Msgf("loaded %d link unwrappers", len(knownUnwrappers))
+	log.Printf("loaded %d link unwrappers", len(knownUnwrappers))
 }

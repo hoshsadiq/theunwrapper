@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type Unwrapper struct {
@@ -66,28 +65,28 @@ func (c *Unwrapper) Description() string {
 func (c *Unwrapper) Do(path string) (*url.URL, *url.URL, error) {
 	endpointStr := fmt.Sprintf("https://%s/%s", c.host, path)
 	endpoint, _ := url.Parse(endpointStr)
-	log.Info().Msgf("visiting: %s", endpoint.String())
+	log.Printf("visiting: %s", endpoint.String())
 
 	// Testing the new HTTP client with the custom DNS resolver.
 	resp, err := c.httpClient.Head(endpoint.String())
 	if err != nil {
-		log.Error().Msgf("error doing HEAD on: %s err: %s", endpoint, err)
+		log.Printf("error: failed doing HEAD on: %s err: %s", endpoint, err)
 		return endpoint, nil, err
 	}
 
 	location, ok := resp.Header["Location"]
 
 	if !ok {
-		log.Error().Msgf("nil location header from: %s", endpoint.String())
+		log.Printf("error: got nil location header from: %s", endpoint.String())
 		return endpoint, nil, errors.New("no location header found")
 	} else if len(location) == 0 {
-		log.Error().Msgf("empty location header from: %s", endpoint.String())
+		log.Printf("error: got empty location header from: %s", endpoint.String())
 		return endpoint, nil, errors.New("location header empty")
 	}
 
 	out, err := url.Parse(location[0])
 	if err != nil {
-		log.Error().Msgf("error parsing location url: %s from: %s", location[0], endpoint.String())
+		log.Printf("error: failed to parse location url: %s from: %s", location[0], endpoint.String())
 		return endpoint, nil, errors.New("error parsing location url")
 	}
 	return endpoint, out, nil

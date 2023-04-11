@@ -2,11 +2,11 @@ package chain
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/djhworld/theunwrapper/unwrap"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -20,7 +20,7 @@ func New(r *http.Request, unwrappers map[string]*unwrap.Unwrapper) (*ChainedUnwr
 		if start == nil {
 			return nil, ErrNoUnwrapperFound
 		} else {
-			log.Info().Msgf("using unwrapper for: %s", start.Host())
+			log.Printf("using unwrapper for: %s", start.Host())
 		}
 	} else {
 		return nil, ErrNoUnwrapperFound
@@ -29,15 +29,15 @@ func New(r *http.Request, unwrappers map[string]*unwrap.Unwrapper) (*ChainedUnwr
 	return &ChainedUnwrapper{
 		ur:         r.URL,
 		unwrapper:  start,
-		chain:      []ChainEntry{},
+		chain:      []Entry{},
 		unwrappers: unwrappers,
 		visitList:  make(map[string]struct{}),
 	}, nil
 }
 
-// ChainEntry describes the transition from moving to one URL to the next, given
+// Entry describes the transition from moving to one URL to the next, given
 // the unwrapper that was used
-type ChainEntry struct {
+type Entry struct {
 	From  url.URL
 	To    url.URL
 	Using unwrap.Unwrapper
@@ -46,7 +46,7 @@ type ChainEntry struct {
 type ChainedUnwrapper struct {
 	ur         *url.URL
 	unwrapper  *unwrap.Unwrapper
-	chain      []ChainEntry
+	chain      []Entry
 	visitList  map[string]struct{}
 	unwrappers map[string]*unwrap.Unwrapper
 	err        error
@@ -57,14 +57,14 @@ func (c *ChainedUnwrapper) Err() error {
 	return c.err
 }
 
-// Err returns the currently set URL
+// Last returns the currently set URL
 func (c *ChainedUnwrapper) Last() *url.URL {
 	return c.ur
 }
 
-// Err returns a slice of ChainEntry structs that describe the
+// Visited returns a slice of ChainEntry structs that describe the
 // hops visited before finding the final URL
-func (c *ChainedUnwrapper) Visited() []ChainEntry {
+func (c *ChainedUnwrapper) Visited() []Entry {
 	return c.chain
 }
 
@@ -73,7 +73,7 @@ func (c *ChainedUnwrapper) Visited() []ChainEntry {
 func (c *ChainedUnwrapper) Next() bool {
 	// try to ensure we don't visit the same URL twice
 	if _, ok := c.visitList[c.ur.String()]; ok {
-		log.Error().Msg("cycle detected!")
+		log.Printf("error: cycle detected!")
 		c.err = errors.New("cycle detetected")
 		return false
 	}
@@ -86,19 +86,19 @@ func (c *ChainedUnwrapper) Next() bool {
 	c.visitList[endpoint.String()] = struct{}{}
 
 	if result != nil {
-		c.chain = append(c.chain, ChainEntry{From: *endpoint, To: *result, Using: *c.unwrapper})
+		c.chain = append(c.chain, Entry{From: *endpoint, To: *result, Using: *c.unwrapper})
 		if r, ok := c.unwrappers[result.Host]; ok {
 			c.unwrapper = r
 			c.ur = result
 			return true
 		}
 	} else {
-		log.Error().Msg("failed to lookup!")
+		log.Printf("error: failed to lookup!")
 		c.unwrapper = nil
 		return false
 	}
 
-	log.Debug().Msgf("finished, found: %s", result)
+	log.Printf("finished, found: %s", result)
 
 	c.unwrapper = nil
 	c.ur = result

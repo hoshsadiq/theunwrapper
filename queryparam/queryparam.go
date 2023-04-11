@@ -2,10 +2,9 @@ package queryparam
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
-
-	"github.com/rs/zerolog/log"
 )
 
 var badQueryParams = map[string]struct{}{
@@ -71,7 +70,7 @@ func Strip(ur url.URL) *url.URL {
 				q.Del(k)
 				msg = msg + "...stripping"
 				stripCount++
-				log.Debug().Msg(msg)
+				log.Printf(msg)
 				continue
 			}
 
@@ -80,18 +79,18 @@ func Strip(ur url.URL) *url.URL {
 				if strings.HasPrefix(k, prefix) {
 					q.Del(k)
 					msg = msg + "...stripping"
-					log.Debug().Msg(msg)
+					log.Printf(msg)
 					stripCount++
 					stripped = true
 					break
 				}
 			}
 			if !stripped {
-				log.Debug().Msg(msg + "...keeping")
+				log.Printf(msg + "...keeping")
 			}
 		}
 		ur.RawQuery = q.Encode()
-		log.Debug().Msgf("stripped %d query params from link", stripCount)
+		log.Printf("stripped %d query params from link", stripCount)
 	}
 
 	if ur.Fragment != "" {
