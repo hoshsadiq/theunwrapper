@@ -31,13 +31,13 @@ func New(host, description, upstreamDNSIPPort string) *Unwrapper {
 		},
 	}
 
-	transport := *(http.DefaultTransport.(*http.Transport))
+	transport := http.DefaultTransport.(*http.Transport)
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialContext(ctx, network, addr)
 	}
 
 	client := http.Client{
-		Transport: &transport,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			// Don't follow redirects
 			return http.ErrUseLastResponse

@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -57,9 +58,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	chained, err := chain.New(r, knownUnwrappers)
 	if err != nil {
 		log.Printf("error: failed to get chained wrappers: %s", err)
-		w.WriteHeader(http.StatusBadRequest)
 		output.Err = err
-		tmpl.Execute(w, output)
+		execTemplate(w, output, http.StatusBadRequest)
 		return
 	}
 
@@ -68,21 +68,38 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	output.Visited = chained.Visited()
 
-	if chained.Err() != nil || chained.Last() == nil {
-		w.WriteHeader(http.StatusInternalServerError)
+	if chained.Err() != nil {
+		log.Printf("error: failed to get last result: %s", chained.Err())
 		output.Err = chained.Err()
-		tmpl.Execute(w, output)
+		execTemplate(w, output, http.StatusInternalServerError)
+		return
+	}
+
+	if chained.Last() == nil {
+		log.Printf("error: failed to get last result: empty result")
+		output.Err = errors.New("empty result")
+		execTemplate(w, output, http.StatusInternalServerError)
 		return
 	}
 
 	output.Result = chained.Last()
 	output.Err = nil
 
-	if err := tmpl.Execute(w, output); err != nil {
-		log.Printf("error: failed to parse template: %s", err)
-	} else {
-		log.Println("completed processing request")
+	if execTemplate(w, output, http.StatusInternalServerError) {
+		return
 	}
+
+	log.Println("completed processing request")
+}
+
+func execTemplate(w http.ResponseWriter, output Output, statusCode int) bool {
+	if err := tmpl.Execute(w, output); err != nil {
+		w.WriteHeader(statusCode)
+		log.Printf("error: failed to parse template: %s", err)
+		_, _ = w.Write([]byte("error: failed to parse template."))
+		return true
+	}
+	return false
 }
 
 func main() {
